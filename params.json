@@ -1,0 +1,38 @@
+{
+    "input_video_path": "data/test_day_video.mkv",
+    "output_video_dir": "videos/",
+    "output_image_dir": "images/",
+    "output_df_path": "df/data_dump.parquet",
+    "daytime": true,
+    "process_seconds": 100,
+    "is_watching": true,
+    "is_keep_video": true,
+    "addlabels": ["pos_msec", "auto1sec", "bridged"],
+    "autocorrelation":{
+      "delta": 13,
+      "thresholds":[25000.0, 50000.0, 100000.0, 250000.0, 500000.0, 1000000.0]
+    },
+
+
+    "offset": null,
+    "roi_1": {
+        "x1": 300,
+        "y1": 650,
+        "x2": 300,
+        "y2": 70,
+        "x3": 1000,
+        "y3": 70,
+        "x4": 1000,
+        "y4": 650
+    },
+
+    "thresholds": {
+        "daytime":{
+            "interval_seconds": 2,
+            "t0": 360000.0,
+            "t1": 500000.0
+        }
+
+      }
+
+}

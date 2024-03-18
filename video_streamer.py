@@ -1,4 +1,3 @@
-import time
 from collections import deque
 import cv2
 from video_grabber import VideoGrabber, VideoWriter
@@ -6,10 +5,9 @@ import logging
 
 
 class VideoPlayer:
-    def __init__(self, roi_comp, cap_iface: VideoGrabber = None,
-                 process_roi_fn=None, datalogger_fn=None,
-                 out_video_writer: VideoWriter = None, windowing_roi_fn=None,
-                 window_size_frames=2, start_time_seconds=None):
+    def __init__(self, roi_comp, cap_iface: VideoGrabber = None, process_roi_fn=None, datalogger_fn=None,
+                 out_video_writer: VideoWriter = None, windowing_roi_fn=None, window_size_frames=2,
+                 start_time_seconds=None):
         """
         Class to compose the components you would like to use for the
         pipeline
@@ -71,7 +69,7 @@ class VideoPlayer:
         self.cap_iface.open_video()
         # self.cap_obj = self.cap_iface.get_video_obj()
         if self.start_time_seconds is not None:
-            self.cap_iface.set_pos_seconds(819.0)
+            self.cap_iface.set_pos_seconds(1)
 
         prev_frame = None
         # used for debug type stuff
@@ -81,10 +79,9 @@ class VideoPlayer:
         # the 0th index is the oldest and th (len -1)th is the newes
         results_dequeue = deque(maxlen=self.window_size_frames)
         try:
-            while not self.stopped:
-                # Performance measurement
-                prev_timestamp = time.time()
+            prev_pos_msec = None
 
+            while not self.stopped:
                 ret, frame = self.cap_iface.get_frame()
                 if not ret:
                     self.cap_iface.release_video()
@@ -97,6 +94,7 @@ class VideoPlayer:
                 # Frame delta statistic calculation
                 millis = self.cap_iface.get_current_timestamp()
                 fps = self.cap_iface.get_fps()
+
                 processed_frame, results = self.process_roi(
                     self.roi_comp, prev_frame, frame)
 
@@ -106,16 +104,21 @@ class VideoPlayer:
                     results.update(self.windowing_roi(results_dequeue))
 
                 if results is not None:
+                    if prev_pos_msec is not None:
+                        pos_msec_diff = millis - prev_pos_msec
+                        # print(results)
+                        if pos_msec_diff > 100000:
+                            print('bridge', pos_msec_diff, results['auto1sec'])
+                            cv2.putText(processed_frame, f"E Diff: {'bridge', pos_msec_diff, results['auto1sec']}",
+                                        (10, 122),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                        (0, 255, 0), 1)
+
                     results.update(
-                        {"ts": frame_counter/fps, "pos_msec": millis})
+                        {"ts": frame_counter / fps, "pos_msec": millis})
 
                 # Output data to datalogger
                 self.datalog(results)
-
-                # Perf / cum-sum measurement
-                # post_frame_proc_ts = time.time()
-                # frame_time_diff = post_frame_proc_ts - prev_timestamp
-                # self.timestamps.append(frame_time_diff)
 
                 # Video outputter when it exists
                 if self.out is not None:
@@ -132,11 +135,14 @@ class VideoPlayer:
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
+                # Update previous pos_msec
+                prev_pos_msec = millis
+
                 # Frame counter for diagnostics
-                frame_counter = frame_counter + 1
+                frame_counter += 1
 
         except Exception as e:
-            logging.exception("Exception in frameloop ", e)
+            logging.exception("Exception in frame loop ", e)
         finally:
             self.cap_iface.release_video()
             if self.out is not None:

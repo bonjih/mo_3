@@ -2,7 +2,9 @@ import time
 import cv2
 import pandas as pd
 
-roi_result_fieldnames = ["ts", "pos_msec", "movement_instant", "auto1sec", "bridged"]
+from video_grabber import VideoGrabber
+
+roi_result_fieldnames = ["ts", "pos_msec", "movement_instant", "auto1sec", "thresh", "bridge status"]
 
 
 def frame_diff(first_frame, prev_frame):
@@ -38,8 +40,8 @@ def autocorrelation_window(results_queue, thresh, delta_frame):  # autocorr n-13
         delta = clamper(results_queue[delta_frame - 1]['movement_instant']) - clamper(
             results_queue[0]['movement_instant'])
         results['auto1sec'] = abs(delta)
-        results['bridged'] = [f"<{ti}:{int(abs(delta) < ti)}" for i, ti in enumerate(thresh)]
-        # print(results['bridged'])
+        results['thresh'] = [f"<{ti}:{int(abs(delta) < ti)}" for i, ti in enumerate(thresh)]
+
     return results
 
 
@@ -59,7 +61,11 @@ def curried_autocorrelaton_window(thresh, delta_frame):
     return curried
 
 
-def process_roi(roi_comp, prev_frame, frame):
+def process_roi(roi_comp, prev_frame, frame, millis_diff):
+    millis_diff_list = []
+    bridge_status = ""
+    results = {}
+
     if frame is not None:
         for roi in roi_comp:
             points = roi.points
@@ -70,13 +76,22 @@ def process_roi(roi_comp, prev_frame, frame):
             frame_roi_region = frame[y1:y4, x1:x4]
 
             diff_im = frame_diff(frame_preprocess(prev_roi_region), frame_preprocess(frame_roi_region))
+            results.update({"ts": time.time(), "movement_instant": round(diff_im.sum(), 4)})
+            results['ts'] = pd.to_datetime(results['ts'], unit='s')
 
             frame_roi_region = diff_im[:, :, 2]
             frame[y1:y4, x1:x4][frame_roi_region == 255] = [0, 0, 255]
 
-            results = {"ts": time.time(), "movement_instant": round(diff_im.sum(), 4)}
-            results['ts'] = pd.to_datetime(results['ts'], unit='s')
-
+            if millis_diff is not None:
+                if millis_diff > 100000 or results['movement_instant'] > 46000000:
+                    millis_diff_list.append(millis_diff)
+                    if bridge_status != 'BRIDGED':
+                        bridge_status = 'BRIDGED'
+                        results.update({"bridge status": bridge_status})
+                elif bridge_status != 'BRIDGED':  # Only update status if not already BRIDGED
+                    bridge_status = 'No Bridge'
+                    results.update({"bridge status": [bridge_status, millis_diff, results['movement_instant']]})
+            print(results)
             return frame, results
     else:
         frame = prev_frame

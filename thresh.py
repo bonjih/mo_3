@@ -23,6 +23,9 @@ def frame_preprocess(frame_ref):
     return cv2.cvtColor(frame_ref, cv2.COLOR_BGR2RGB)
 
 
+processed_items = []  # List to keep track of processed items
+
+
 def autocorrelation_window(results_queue, thresh, delta_frame):  # autocorr n-13
     """
     Using autocorrelation window with the delta_frame-th frame
@@ -41,6 +44,13 @@ def autocorrelation_window(results_queue, thresh, delta_frame):  # autocorr n-13
             results_queue[0]['movement_instant'])
         results['auto1sec'] = abs(delta)
         results['thresh'] = [f"<{ti}:{int(abs(delta) < ti)}" for i, ti in enumerate(thresh)]
+
+        processed_items.append(results['auto1sec'])  # Append the processed item
+
+        if len(processed_items) >= 13:  # Check if 13 items are processed
+            print(len(processed_items))
+
+            # No need to clear processed_items here
 
     return results
 
